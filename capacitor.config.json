@@ -1,0 +1,6 @@
+{
+  "appId": "com.clinicalsanctuary.app",
+  "appName": "Clinical Sanctuary",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
