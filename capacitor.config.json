@@ -1,6 +1,6 @@
 {
   "appId": "com.clinicalsanctuary.app",
-  "appName": "Clinical Sanctuary",
+  "appName": "Posture Monitor",
   "webDir": "dist",
   "bundledWebRuntime": false
 }

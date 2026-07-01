@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as NativeApp } from '@capacitor/app';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { motion, AnimatePresence } from 'motion/react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
-import { Activity } from './components/Activity';
 import { Sensors } from './components/Sensors';
 import { Profile } from './components/Profile';
-import { Calibration } from './components/Calibration';
 import { SensorThresholds } from './components/SensorThresholds';
 import { usePostureEngine } from './hooks/usePostureEngine';
 import { useTrainingSession } from './hooks/useTrainingSession';
@@ -13,39 +15,72 @@ import { useBluetoothSerial, DEFAULT_THRESHOLDS } from './hooks/useBluetoothSeri
 import type { ThresholdConfig } from './hooks/useBluetoothSerial';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [showCalibration, setShowCalibration] = useState(false);
+  const [activeTab, setActiveTabState] = useState('home');
+  const [direction, setDirection] = useState(0);
   const [showThresholds, setShowThresholds] = useState(false);
   const [thresholds, setThresholds] = useState<ThresholdConfig>(DEFAULT_THRESHOLDS);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const lastAlertRef = useRef<number>(0);
+  const badPostureStartRef = useRef<number | null>(null);
+  const alertFiredRef = useRef<boolean>(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const { profile } = useUserProfile();
 
-  // Bluetooth HC-05 connection
+  const tabOrder = ['home', 'stats', 'profile'];
+
+  const setActiveTab = (newTab: string) => {
+    const currentIndex = tabOrder.indexOf(activeTab);
+    const newIndex = tabOrder.indexOf(newTab);
+    setDirection(newIndex > currentIndex ? 1 : -1);
+    setActiveTabState(newTab);
+  };
+
+  // Bluetooth connection (HM-10/HC-08 or HC-05)
   const {
     status: btStatus,
     sensorData,
     errorMessage: btError,
     rawDataLog,
+    discoveredDevices,
     connect: btConnect,
+    connectToNativeDevice,
+    cancelScanning,
     disconnect: btDisconnect,
     checkThresholds,
   } = useBluetoothSerial();
 
-  // Posture engine (uses real sensor data when available, simulation otherwise)
-  const { posture, stats, isMonitoring, recalibrate, setStats } = usePostureEngine(sensorData, thresholds);
+  const [btMode, setBtMode] = useState<'ble' | 'serial'>('ble');
 
-  // Training sessions
+  // Posture engine (uses real sensor data when available, simulation otherwise)
+  const { 
+    posture, stats, isMonitoring, setStats,
+    recordingPose, recordingCountdown, recordedPoses, startRecording
+  } = usePostureEngine(sensorData, thresholds, setThresholds);
+
+  // Hardware Back Button Support (Android)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const backListener = NativeApp.addListener('backButton', () => {
+      if (showThresholds) {
+        setShowThresholds(false);
+      } else if (activeTab !== 'home') {
+        setActiveTab('home');
+      } else {
+        NativeApp.exitApp();
+      }
+    });
+
+    return () => {
+      backListener.then(l => l.remove());
+    };
+  }, [activeTab, showThresholds]);
+
+  // Training sessions (historical data used for Stats)
   const {
-    isTraining, elapsedSeconds, sessionHistory, program,
-    vibrationEnabled, setVibrationEnabled, startTraining, stopTraining, addScore, formatTime,
+    sessionHistory,
   } = useTrainingSession();
 
-  // Feed posture scores into training session
-  useEffect(() => {
-    if (isTraining) addScore(posture.score);
-  }, [posture.score, isTraining, addScore]);
+
 
   // ===== THRESHOLD ALERT SYSTEM =====
   const playAlertSound = useCallback(() => {
@@ -77,7 +112,7 @@ function App() {
         gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
         osc2.stop(ctx.currentTime + 0.3);
       }, 200);
-    } catch {}
+    } catch { }
   }, []);
 
   const fireNotification = useCallback((msg: string) => {
@@ -87,58 +122,93 @@ function App() {
   }, [profile.notificationsEnabled]);
 
   useEffect(() => {
-    if (!sensorData) return;
+    if (!sensorData || !isMonitoring) return;
     const now = Date.now();
-    if (now - lastAlertRef.current < thresholds.alertCooldownMs) return;
 
-    const violations = checkThresholds(sensorData, thresholds);
-    if (violations.length > 0) {
-      lastAlertRef.current = now;
-      setAlertMessage(violations[0]);
-      playAlertSound();
-      fireNotification(violations[0]);
-
-      // Vibrate on mobile (only if not in training to avoid conflict)
-      if (!isTraining && 'vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200, 100, 300]);
+    // Trigger alert based on the calibrated posture status rather than raw sensor values
+    if (posture.status === 'warning' || posture.status === 'bad') {
+      // Bad posture detected — start or continue tracking
+      if (badPostureStartRef.current === null) {
+        badPostureStartRef.current = now;
+        alertFiredRef.current = false;
       }
 
-      // Auto-dismiss alert after 4 seconds
-      setTimeout(() => setAlertMessage(null), 4000);
+      // Check if bad posture has been sustained long enough
+      const elapsed = now - badPostureStartRef.current;
+      if (elapsed >= thresholds.alertDelayMs && !alertFiredRef.current) {
+        alertFiredRef.current = true;
+        const msg = posture.status === 'warning' ? 'Adjust Posture!' : 'Sit Up Straight!';
+        setAlertMessage(msg);
+        playAlertSound();
+        fireNotification(msg);
+
+        // Vibrate on mobile
+        if (Capacitor.isNativePlatform()) {
+          const triggerHaptics = async () => {
+            await Haptics.vibrate({ duration: 500 });
+            setTimeout(() => Haptics.vibrate({ duration: 300 }), 700);
+          };
+          triggerHaptics();
+        } else if ('vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200, 100, 300]);
+        }
+
+        // Auto-dismiss alert after 4 seconds
+        setTimeout(() => setAlertMessage(null), 4000);
+      }
+    } else {
+      // Good posture — reset the timer
+      badPostureStartRef.current = null;
+      alertFiredRef.current = false;
     }
-  }, [sensorData, thresholds, checkThresholds, playAlertSound, fireNotification]);
+  }, [posture.status, sensorData, isMonitoring, thresholds.alertDelayMs, playAlertSound, fireNotification]);
 
-  // Also check thresholds during simulation for demo purposes
-  useEffect(() => {
-    if (sensorData) return; // Only for simulation
-    const now = Date.now();
-    if (now - lastAlertRef.current < thresholds.alertCooldownMs) return;
 
-    if (posture.status === 'bad') {
-      lastAlertRef.current = now;
-      const msg = posture.leftShoulder.pitch > thresholds.leftShoulderPitch
-        ? `Left shoulder: ${posture.leftShoulder.pitch.toFixed(1)}° exceeds ${thresholds.leftShoulderPitch}° limit`
-        : posture.flexValue > thresholds.flexThreshold
-        ? `Back bend: ${posture.flexValue.toFixed(0)} exceeds ${thresholds.flexThreshold} limit`
-        : 'Poor posture detected — sit up straight!';
-      setAlertMessage(msg);
-      playAlertSound();
-      fireNotification(msg);
-      if (!isTraining && 'vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-      setTimeout(() => setAlertMessage(null), 4000);
-    }
-  }, [posture.status, posture.leftShoulder, posture.flexValue, sensorData, thresholds, playAlertSound, fireNotification]);
 
-  const handleCalibrate = () => setShowCalibration(true);
-  const handleCalibrationComplete = () => { recalibrate(); setShowCalibration(false); };
-  const handleStopTraining = () => stopTraining(posture.score);
   const isConnected = btStatus === 'connected';
 
-  // Show calibration overlay
-  if (showCalibration) {
+  // Show native device scanning overlay
+  if (btStatus === 'scanning') {
     return (
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab} isConnected={isConnected || isMonitoring}>
-        <Calibration onComplete={handleCalibrationComplete} onCancel={() => setShowCalibration(false)} />
+      <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isConnected={isConnected || isMonitoring}
+        onConnect={() => btConnect(btMode)}
+        disableSwipe={true}
+      >
+        <div className="flex-1 flex flex-col p-6 items-center justify-center bg-background">
+          <div className="bg-surface-elevated rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-5 border border-outline-variant/20">
+            <h2 className="text-xl font-bold text-on-surface text-center tracking-tight">Nearby Devices</h2>
+            <div className="flex justify-center py-2">
+              <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+            </div>
+            
+            <div className="flex flex-col gap-3 max-h-[45vh] overflow-y-auto px-1 pb-1">
+              {discoveredDevices.length === 0 ? (
+                <p className="text-sm text-center text-on-surface-muted py-4">Scanning for nearby HC-05 modules...</p>
+              ) : (
+                discoveredDevices.map(device => (
+                  <button 
+                    key={device.id} 
+                    onClick={() => connectToNativeDevice(device.id)}
+                    className="p-4 bg-surface rounded-2xl border border-outline-variant shadow-sm text-left hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98]"
+                  >
+                    <p className="font-bold text-on-surface text-[15px]">{device.name || 'Unknown Device'}</p>
+                    <p className="text-xs text-on-surface-muted mt-1 font-mono">{device.id}</p>
+                  </button>
+                ))
+              )}
+            </div>
+            
+            <button 
+              onClick={cancelScanning}
+              className="mt-2 w-full py-3.5 rounded-2xl border border-outline-variant text-on-surface-variant font-bold hover:bg-surface-dim transition-colors active:scale-[0.98]"
+            >
+              Cancel Search
+            </button>
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -146,15 +216,23 @@ function App() {
   // Show threshold settings overlay
   if (showThresholds) {
     return (
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab} isConnected={isConnected || isMonitoring}>
-        <SensorThresholds thresholds={thresholds}
-          onChange={setThresholds}
-          onReset={() => setThresholds(DEFAULT_THRESHOLDS)} />
-        <div className="px-5 pb-6">
-          <button onClick={() => setShowThresholds(false)}
-            className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/15 active:scale-[0.97] transition-all">
-            ← Back to App
-          </button>
+      <Layout 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        isConnected={isConnected || isMonitoring}
+        onConnect={() => btConnect(btMode)}
+        disableSwipe={true}
+      >
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-[80px]">
+          <SensorThresholds thresholds={thresholds}
+            onChange={setThresholds}
+            onReset={() => setThresholds(DEFAULT_THRESHOLDS)} />
+          <div className="px-5 pb-6">
+            <button onClick={() => setShowThresholds(false)}
+              className="w-full py-4 rounded-2xl bg-surface-elevated border border-outline-variant/30 text-on-surface font-bold text-sm shadow-sm active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+              <span className="text-lg">←</span> Back to Dashboard
+            </button>
+          </div>
         </div>
       </Layout>
     );
@@ -164,61 +242,69 @@ function App() {
     switch (activeTab) {
       case 'home':
         return (
-          <>
+          <div className="px-2 pt-4 pb-12 space-y-4">
             {/* Bluetooth Connection Bar */}
-            <div className="px-4 pt-2">
-              <div className="bg-surface-elevated rounded-xl p-2.5 border border-outline-variant/10 flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success animate-pulse' : 'bg-on-surface-muted'}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-bold text-on-surface leading-tight">
-                    {btStatus === 'connected' ? 'HC-05 Connected' :
-                     btStatus === 'connecting' ? 'Connecting...' :
-                     btStatus === 'error' ? 'Connection Error' :
-                     'No Sensor Connected'}
-                  </p>
-                  {btError && <p className="text-[10px] text-danger truncate leading-tight">{btError}</p>}
-                  {!isConnected && !btError && <p className="text-[10px] text-on-surface-muted leading-tight">Using simulated data</p>}
-                </div>
-                <div className="flex gap-1.5">
-                  <button onClick={() => setShowThresholds(true)}
-                    className="p-1.5 rounded-lg border border-outline text-on-surface-variant hover:bg-surface-dim transition-all">
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Settings</span>
+            <div className="bg-surface-elevated rounded-[28px] px-4 py-3 border border-outline-variant/10 flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success animate-pulse' : 'bg-on-surface-muted'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold text-on-surface leading-tight">
+                  {btStatus === 'connected' ? 'Sensor Connected' :
+                    btStatus === 'connecting' ? 'Connecting...' :
+                      btStatus === 'error' ? 'Connection Error' :
+                        'No Sensor Connected'}
+                </p>
+                {btError && <p className="text-[10px] text-danger truncate leading-tight">{btError}</p>}
+                {!isConnected && !btError && !Capacitor.isNativePlatform() && (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <select 
+                      value={btMode} 
+                      onChange={(e) => setBtMode(e.target.value as 'ble' | 'serial')}
+                      className="bg-surface-dim text-[10px] font-bold text-on-surface-muted border-none p-0 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
+                    >
+                      <option value="ble">BLE (HM-10)</option>
+                      <option value="serial">SERIAL (HC-05)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={() => setShowThresholds(true)}
+                  className="p-1.5 rounded-lg border border-outline text-on-surface-variant hover:bg-surface-dim transition-all">
+                  <span className="text-[9px] font-bold uppercase tracking-wider">Settings</span>
+                </button>
+                {isConnected ? (
+                  <button onClick={btDisconnect}
+                    className="px-2 py-1.5 rounded-lg bg-danger/10 text-danger text-[10px] font-bold hover:bg-danger/20 transition-all uppercase tracking-wide">
+                    Off
                   </button>
-                  {isConnected ? (
-                    <button onClick={btDisconnect}
-                      className="px-2 py-1.5 rounded-lg bg-danger/10 text-danger text-[10px] font-bold hover:bg-danger/20 transition-all uppercase tracking-wide">
-                      Off
-                    </button>
-                  ) : (
-                    <button onClick={btConnect}
-                      className="px-2 py-1.5 rounded-lg bg-primary text-white text-[10px] font-bold hover:opacity-90 transition-all uppercase tracking-wide">
-                      Connect
-                    </button>
-                  )}
-                </div>
+                ) : (
+                  <button onClick={() => btConnect(btMode)}
+                    className="px-2 py-1.5 rounded-lg bg-primary text-white text-[10px] font-bold hover:opacity-90 transition-all uppercase tracking-wide">
+                    Connect
+                  </button>
+                )}
               </div>
             </div>
 
             <Dashboard posture={posture} stats={stats} isMonitoring={isMonitoring}
-              thresholds={thresholds} onCalibrate={handleCalibrate} />
-          </>
+              thresholds={thresholds} 
+              onRecordPosture={startRecording}
+              recordingPose={recordingPose}
+              recordingCountdown={recordingCountdown}
+              recordedPoses={recordedPoses}
+              rawDataLog={rawDataLog} isConnected={isConnected} />
+          </div>
         );
-      case 'train':
-        return (
-          <Activity posture={posture} isTraining={isTraining} elapsedSeconds={elapsedSeconds}
-            program={program} sessionHistory={sessionHistory} vibrationEnabled={vibrationEnabled}
-            onStartTraining={startTraining} onStopTraining={handleStopTraining}
-            onToggleVibration={setVibrationEnabled} formatTime={formatTime} />
-        );
+
       case 'stats':
         return <Sensors stats={stats} sessionHistory={sessionHistory} />;
       case 'profile':
         return (
-          <Profile 
-            stats={stats} 
-            btStatus={btStatus} 
-            onConnectDevice={btConnect} 
-            onDisconnectDevice={btDisconnect} 
+          <Profile
+            stats={stats}
+            btStatus={btStatus}
+            onConnectDevice={() => btConnect(btMode)}
+            onDisconnectDevice={btDisconnect}
           />
         );
       default:
@@ -226,8 +312,34 @@ function App() {
     }
   };
 
+  const slideVariants = {
+    enter: (direction: number) => {
+      return {
+        x: direction > 0 ? '100%' : '-100%',
+        opacity: 0
+      };
+    },
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1
+    },
+    exit: (direction: number) => {
+      return {
+        zIndex: 0,
+        x: direction < 0 ? '100%' : '-100%',
+        opacity: 0
+      };
+    }
+  };
+
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} isConnected={isConnected || isMonitoring}>
+    <Layout 
+      activeTab={activeTab} 
+      setActiveTab={setActiveTab} 
+      isConnected={isConnected || isMonitoring}
+      onConnect={() => btConnect(btMode)}
+    >
       {/* Alert Notification Toast */}
       {alertMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[90%] animate-slide-up">
@@ -243,7 +355,25 @@ function App() {
           </div>
         </div>
       )}
-      {renderActiveTab()}
+      <div className="flex-1 relative w-full h-full overflow-hidden">
+        <AnimatePresence initial={false} custom={direction}>
+          <motion.div
+            key={activeTab}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+              x: { type: "spring", stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 }
+            }}
+            className="absolute inset-0 w-full h-full flex flex-col overflow-y-auto overflow-x-hidden pb-[68px]"
+          >
+            {renderActiveTab()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </Layout>
   );
 }

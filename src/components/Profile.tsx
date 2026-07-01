@@ -73,11 +73,11 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
 
   const settingsItems = [
     { icon: Bell, label: 'Notifications', value: profile.notificationsEnabled ? 'On' : 'Off', onClick: handleToggleNotifications },
-    { 
-      icon: Bluetooth, 
-      label: 'Device', 
-      value: btStatus === 'connected' ? 'Connected' : btStatus === 'connecting' ? 'Connecting...' : 'Tap to pair', 
-      onClick: btStatus === 'connected' ? onDisconnectDevice : onConnectDevice 
+    {
+      icon: Bluetooth,
+      label: 'Device',
+      value: btStatus === 'connected' ? 'Connected' : btStatus === 'connecting' ? 'Connecting...' : 'Tap to pair',
+      onClick: btStatus === 'connected' ? onDisconnectDevice : onConnectDevice
     },
     { icon: Target, label: 'Daily Goal', value: `${profile.dailyGoal || 180} min`, onClick: handleChangeGoal },
     { icon: Shield, label: 'Privacy', value: 'Local only' },
@@ -85,7 +85,7 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
   ];
 
   return (
-    <div className="px-5 py-6 space-y-5">
+    <div className="px-2 py-4 space-y-5">
       {/* Profile Card */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
         className="bg-surface-elevated rounded-3xl p-6 shadow-sm border border-outline-variant/10 flex flex-col items-center text-center">
@@ -107,23 +107,23 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
           </div>
           {isEditing && (
             <>
-              <button 
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute bottom-0 right-0 p-1.5 bg-primary text-white rounded-full border-2 border-surface-elevated shadow-md hover:bg-primary-dark transition-colors"
               >
                 <Camera className="w-4 h-4" />
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleImageUpload} 
-                accept="image/*" 
-                className="hidden" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
               />
             </>
           )}
         </div>
-        
+
         {isEditing ? (
           <div className="w-full space-y-3 mt-2">
             <input
@@ -141,13 +141,13 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
               placeholder="your.email@example.com"
             />
             <div className="flex gap-2 justify-center pt-2">
-              <button 
+              <button
                 onClick={handleCancel}
                 className="flex-1 px-4 py-2 rounded-xl border border-outline text-xs font-semibold text-on-surface-variant hover:bg-surface-dim transition-all flex items-center justify-center gap-1"
               >
                 <X className="w-4 h-4" /> Cancel
               </button>
-              <button 
+              <button
                 onClick={handleSave}
                 className="flex-1 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold shadow-md shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1"
               >
@@ -159,7 +159,7 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
           <>
             <h2 className="text-xl font-extrabold text-on-surface">{profile.name}</h2>
             <p className="text-sm text-on-surface-muted">{profile.email}</p>
-            <button 
+            <button
               onClick={() => setIsEditing(true)}
               className="mt-3 px-4 py-1.5 rounded-lg border border-outline text-xs font-semibold text-on-surface-variant hover:bg-surface-dim transition-all"
             >
@@ -170,7 +170,7 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
       </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-1.5">
         {[
           { icon: Flame, value: stats.currentStreak, label: 'Streak', color: 'text-accent' },
           { icon: Clock, value: `${Math.floor(stats.todayUprightMinutes / 60)}h`, label: 'Today', color: 'text-success' },
@@ -179,10 +179,10 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
         ].map((item, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * 0.05 }}
-            className="bg-surface-elevated rounded-2xl p-3 border border-outline-variant/10 text-center">
-            <item.icon className={`w-4 h-4 ${item.color} mx-auto mb-1.5`} />
-            <p className="text-lg font-extrabold text-on-surface leading-none">{item.value}</p>
-            <p className="text-[9px] text-on-surface-muted font-medium uppercase tracking-wider mt-1">{item.label}</p>
+            className="bg-surface-elevated rounded-2xl p-2 border border-outline-variant/10 text-center">
+            <item.icon className={`w-3.5 h-3.5 ${item.color} mx-auto mb-1.5`} />
+            <p className="text-base font-extrabold text-on-surface leading-none">{item.value}</p>
+            <p className="text-[8px] text-on-surface-muted font-medium uppercase tracking-wider mt-1">{item.label}</p>
           </motion.div>
         ))}
       </div>
@@ -192,16 +192,15 @@ export function Profile({ stats, btStatus, onConnectDevice, onDisconnectDevice }
         <h3 className="text-base font-bold text-on-surface mb-3 flex items-center gap-2">
           <Award className="w-4 h-4 text-accent" /> Achievements
         </h3>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2">
           {achievements.map((ach, i) => (
-            <div key={i} className={`rounded-2xl p-3 text-center border transition-all ${
-              ach.unlocked
+            <div key={i} className={`rounded-2xl p-2.5 text-center border transition-all ${ach.unlocked
                 ? 'bg-surface-elevated border-primary/20 shadow-sm'
                 : 'bg-surface-dim border-outline-variant/10 opacity-50'
-            }`}>
-              <span className="text-2xl block mb-1.5">{ach.icon}</span>
-              <p className="text-[11px] font-bold text-on-surface leading-tight">{ach.title}</p>
-              <p className="text-[9px] text-on-surface-muted mt-0.5 leading-tight">{ach.desc}</p>
+              }`}>
+              <span className="text-xl block mb-1">{ach.icon}</span>
+              <p className="text-[10px] font-bold text-on-surface leading-tight">{ach.title}</p>
+              <p className="text-[8px] text-on-surface-muted mt-0.5 leading-tight">{ach.desc}</p>
             </div>
           ))}
         </div>

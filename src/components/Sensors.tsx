@@ -26,7 +26,7 @@ export function Sensors({ stats, sessionHistory }: StatsProps) {
   const avgScore = Math.round(stats.weeklyData.reduce((sum, d) => sum + d.score, 0) / stats.weeklyData.length);
 
   return (
-    <div className="px-5 py-6 space-y-5">
+    <div className="px-2 py-4 space-y-5">
       {/* Header Stats */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h2 className="text-2xl font-extrabold text-on-surface mb-1">Statistics</h2>
@@ -34,7 +34,7 @@ export function Sensors({ stats, sessionHistory }: StatsProps) {
       </motion.div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
         {[
           { label: 'Avg Score', value: `${avgScore}%`, icon: Target, color: 'text-primary', bg: 'bg-primary-container' },
           { label: 'Total Hours', value: `${totalUprightHours}h`, icon: Clock, color: 'text-success', bg: 'bg-success-light' },
@@ -42,12 +42,12 @@ export function Sensors({ stats, sessionHistory }: StatsProps) {
         ].map((item, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * 0.05 }}
-            className="bg-surface-elevated rounded-2xl p-3.5 border border-outline-variant/10 text-center">
-            <div className={`w-8 h-8 rounded-lg ${item.bg} flex items-center justify-center mx-auto mb-2`}>
-              <item.icon className={`w-4 h-4 ${item.color}`} />
+            className="bg-surface-elevated rounded-2xl p-2.5 border border-outline-variant/10 text-center">
+            <div className={`w-7 h-7 rounded-lg ${item.bg} flex items-center justify-center mx-auto mb-2`}>
+              <item.icon className={`w-3.5 h-3.5 ${item.color}`} />
             </div>
-            <p className="text-lg font-extrabold text-on-surface">{item.value}</p>
-            <p className="text-[10px] font-medium text-on-surface-muted uppercase tracking-wider">{item.label}</p>
+            <p className="text-base font-extrabold text-on-surface">{item.value}</p>
+            <p className="text-[9px] font-medium text-on-surface-muted uppercase tracking-wider">{item.label}</p>
           </motion.div>
         ))}
       </div>

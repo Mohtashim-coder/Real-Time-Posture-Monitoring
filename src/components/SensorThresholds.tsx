@@ -42,8 +42,69 @@ function ThresholdSlider({ label, unit, value, min, max, step, sublabel, onChang
   );
 }
 
+function DualRangeSlider({ label, unit, value, min, max, step, sublabel, onChange }: {
+  label: string; unit: string; value: [number, number]; min: number; max: number;
+  step: number; sublabel: string; onChange: (v: [number, number]) => void;
+}) {
+  const minPercent = ((value[0] - min) / (max - min)) * 100;
+  const maxPercent = ((value[1] - min) / (max - min)) * 100;
+
+  const handleMinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Math.min(parseFloat(e.target.value), value[1] - step);
+    onChange([val, value[1]]);
+  };
+
+  const handleMaxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Math.max(parseFloat(e.target.value), value[0] + step);
+    onChange([value[0], val]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <style>{`
+        .dual-range-thumb {
+          pointer-events: none;
+        }
+        .dual-range-thumb::-webkit-slider-thumb {
+          pointer-events: auto;
+        }
+        .dual-range-thumb::-moz-range-thumb {
+          pointer-events: auto;
+        }
+      `}</style>
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-sm font-semibold text-on-surface">{label}</span>
+          <span className="text-xs text-on-surface-muted ml-1.5">({sublabel})</span>
+        </div>
+        <span className="text-sm font-bold text-primary">Threshold: {value[0]}{unit} - {value[1]}{unit}</span>
+      </div>
+      <div className="relative h-8 flex items-center">
+        <div className="absolute inset-x-0 h-2 bg-surface-dim rounded-full overflow-hidden">
+          <div className="absolute h-full bg-gradient-to-r from-warning to-danger rounded-full"
+            style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }} />
+        </div>
+        <input type="range" min={min} max={max} step={step} value={value[0]}
+          onChange={handleMinChange}
+          className="dual-range-thumb absolute inset-x-0 w-full h-8 opacity-0 z-10" />
+        <input type="range" min={min} max={max} step={step} value={value[1]}
+          onChange={handleMaxChange}
+          className="dual-range-thumb absolute inset-x-0 w-full h-8 opacity-0 z-20" />
+        <div className="absolute h-5 w-5 bg-surface-elevated border-2 border-primary rounded-full shadow-md pointer-events-none z-30"
+          style={{ left: `calc(${minPercent}% - 10px)` }} />
+        <div className="absolute h-5 w-5 bg-surface-elevated border-2 border-primary rounded-full shadow-md pointer-events-none z-30"
+          style={{ left: `calc(${maxPercent}% - 10px)` }} />
+      </div>
+      <div className="flex justify-between text-[10px] text-on-surface-muted">
+        <span>{min}{unit}</span>
+        <span>{max}{unit}</span>
+      </div>
+    </div>
+  );
+}
+
 export function SensorThresholds({ thresholds, onChange, onReset }: SensorThresholdsProps) {
-  const update = (key: keyof ThresholdConfig, val: number) => {
+  const update = <K extends keyof ThresholdConfig>(key: K, val: ThresholdConfig[K]) => {
     onChange({ ...thresholds, [key]: val });
   };
 
@@ -75,11 +136,11 @@ export function SensorThresholds({ thresholds, onChange, onReset }: SensorThresh
           <div className="w-3 h-3 rounded-full bg-secondary" />
           <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Left Shoulder (MPU6050)</h3>
         </div>
-        <ThresholdSlider label="Pitch" sublabel="forward lean" unit="°"
-          value={thresholds.leftShoulderPitch} min={5} max={45} step={1}
+        <DualRangeSlider label="Pitch" sublabel="forward lean" unit="°"
+          value={thresholds.leftShoulderPitch} min={-180} max={180} step={1}
           onChange={v => update('leftShoulderPitch', v)} />
-        <ThresholdSlider label="Roll" sublabel="side tilt" unit="°"
-          value={thresholds.leftShoulderRoll} min={5} max={35} step={1}
+        <DualRangeSlider label="Roll" sublabel="side tilt" unit="°"
+          value={thresholds.leftShoulderRoll} min={-180} max={180} step={1}
           onChange={v => update('leftShoulderRoll', v)} />
       </motion.div>
 
@@ -90,11 +151,11 @@ export function SensorThresholds({ thresholds, onChange, onReset }: SensorThresh
           <div className="w-3 h-3 rounded-full bg-primary" />
           <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Right Shoulder (MPU6050)</h3>
         </div>
-        <ThresholdSlider label="Pitch" sublabel="forward lean" unit="°"
-          value={thresholds.rightShoulderPitch} min={5} max={45} step={1}
+        <DualRangeSlider label="Pitch" sublabel="forward lean" unit="°"
+          value={thresholds.rightShoulderPitch} min={-180} max={180} step={1}
           onChange={v => update('rightShoulderPitch', v)} />
-        <ThresholdSlider label="Roll" sublabel="side tilt" unit="°"
-          value={thresholds.rightShoulderRoll} min={5} max={35} step={1}
+        <DualRangeSlider label="Roll" sublabel="side tilt" unit="°"
+          value={thresholds.rightShoulderRoll} min={-180} max={180} step={1}
           onChange={v => update('rightShoulderRoll', v)} />
       </motion.div>
 
@@ -105,18 +166,18 @@ export function SensorThresholds({ thresholds, onChange, onReset }: SensorThresh
           <div className="w-3 h-3 rounded-full bg-accent" />
           <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Back Flex Sensor</h3>
         </div>
-        <ThresholdSlider label="Bend Value" sublabel="higher = more bend" unit=""
-          value={thresholds.flexThreshold} min={100} max={800} step={10}
+        <DualRangeSlider label="Bend Value" sublabel="higher = more bend" unit=""
+          value={thresholds.flexThreshold} min={0} max={1000} step={10}
           onChange={v => update('flexThreshold', v)} />
       </motion.div>
 
-      {/* Alert Cooldown */}
+      {/* Alert Delay */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
         className="bg-surface-elevated rounded-2xl p-5 border border-outline-variant/10 space-y-5">
-        <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Alert Cooldown</h3>
-        <ThresholdSlider label="Cooldown" sublabel="between alerts" unit="s"
-          value={thresholds.alertCooldownMs / 1000} min={2} max={30} step={1}
-          onChange={v => update('alertCooldownMs', v * 1000)} />
+        <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Alert Delay</h3>
+        <ThresholdSlider label="Delay" sublabel="after bad posture" unit="s"
+          value={thresholds.alertDelayMs / 1000} min={2} max={30} step={1}
+          onChange={v => update('alertDelayMs', v * 1000)} />
       </motion.div>
 
       {/* Action Buttons */}

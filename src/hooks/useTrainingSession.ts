@@ -71,13 +71,13 @@ export function useTrainingSession() {
 
   const startVibration = useCallback(() => {
     if (vibrationIntervalRef.current) return;
-    
+
     const vibrate = () => {
       if ('vibrate' in navigator) {
         navigator.vibrate([300, 100, 300]);
       }
     };
-    
+
     vibrate();
     vibrationIntervalRef.current = setInterval(vibrate, 1000);
   }, []);
@@ -85,7 +85,7 @@ export function useTrainingSession() {
   const stopTraining = useCallback((currentScore: number) => {
     setIsTraining(false);
     stopVibration();
-    
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;

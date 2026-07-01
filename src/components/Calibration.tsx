@@ -14,7 +14,7 @@ export function Calibration({ onComplete, onCancel }: CalibrationProps) {
   const [isCalibrating, setIsCalibrating] = useState(false);
 
   const steps = [
-    { title: 'Place Device', desc: 'Attach the sensor to your upper back between the shoulder blades' },
+    { title: 'Place Devices', desc: 'Attach sensors to both shoulders and the center of your upper back' },
     { title: 'Sit Upright', desc: 'Sit in your best posture with ears aligned over shoulders' },
     { title: 'Hold Still', desc: 'Maintain position while we capture your baseline' },
     { title: 'Complete!', desc: 'Your neutral posture has been calibrated successfully' },
@@ -68,28 +68,40 @@ export function Calibration({ onComplete, onCancel }: CalibrationProps) {
       </p>
 
       {/* Step Content */}
-      <motion.div key={step} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-        className="bg-surface-elevated rounded-3xl p-6 shadow-sm border border-outline-variant/10">
-
+      <motion.div 
+        key={step} 
+        initial={{ opacity: 0, x: 20 }} 
+        animate={{ opacity: 1, x: 0 }}
+        drag={step !== 2 ? "x" : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.1}
+        dragTransition={{ bounceStiffness: 500, bounceDamping: 25 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.x < -100) {
+            // Swipe Left (Next)
+            if (step < 2) handleNext();
+            else if (step === 3) onComplete();
+          } else if (info.offset.x > 100) {
+            // Swipe Right (Back)
+            if (step > 0 && step !== 2) setStep(s => s - 1);
+          }
+        }}
+        className="bg-surface-elevated rounded-3xl p-6 shadow-sm border border-outline-variant/10 cursor-grab active:cursor-grabbing touch-none"
+      >
+        {/* ... (rest of the content remains same) ... */}
         {step < 3 ? (
           <div className="flex flex-col items-center text-center">
-            {/* Icon */}
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-5 ${
-              step === 2 ? 'bg-primary-container' : 'bg-surface-dim'
-            }`}>
-              {step === 2 ? (
-                <div className="relative">
-                  <Accessibility className="w-10 h-10 text-primary" />
-                  {isCalibrating && <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />}
-                </div>
-              ) : (
-                <Accessibility className="w-10 h-10 text-on-surface-variant" />
-              )}
-            </div>
-
+            {/* ... */}
             <h2 className="text-2xl font-extrabold text-on-surface mb-2">{steps[step].title}</h2>
             <p className="text-sm text-on-surface-variant max-w-xs leading-relaxed">{steps[step].desc}</p>
-
+            
+            {step < 2 && (
+              <div className="mt-8 flex items-center gap-2 text-primary/40 animate-pulse">
+                <span className="text-[10px] font-bold uppercase tracking-widest">Swipe Left to Continue</span>
+                <ArrowRight className="w-3 h-3" />
+              </div>
+            )}
+            
             {/* Countdown Timer (Step 2) */}
             {step === 2 && isCalibrating && (
               <div className="mt-6">
@@ -121,11 +133,15 @@ export function Calibration({ onComplete, onCancel }: CalibrationProps) {
                 <svg viewBox="0 0 160 224" className="w-full h-full text-surface-container fill-current">
                   <path d="M80,16 C96,16 108,30 108,50 C108,70 96,82 80,82 C64,82 52,70 52,50 C52,30 64,16 80,16 M108,82 L125,100 L135,170 L125,220 L112,220 L115,170 L100,110 L60,110 L45,170 L48,220 L35,220 L28,170 L35,100 L52,82 Z" />
                 </svg>
-                {/* Sensor placement dots */}
-                {[{ top: 95, label: 'C7' }, { top: 115, label: 'T6' }, { top: 140, label: 'L3' }].map((dot, i) => (
-                  <div key={i} className="absolute left-1/2 -translate-x-1/2" style={{ top: dot.top }}>
+                {/* Sensor placement dots (2 shoulders, 1 back) */}
+                {[
+                  { top: 88, left: '38%', label: 'L' }, 
+                  { top: 88, left: '62%', label: 'R' }, 
+                  { top: 130, left: '50%', label: 'B' }
+                ].map((dot, i) => (
+                  <div key={i} className="absolute -translate-x-1/2" style={{ top: dot.top, left: dot.left }}>
                     <div className="relative">
-                      {i === 1 && <div className="absolute -inset-2 animate-ping rounded-full bg-primary/25" />}
+                      <div className="absolute -inset-2 animate-ping rounded-full bg-primary/25" />
                       <div className="w-4 h-4 bg-primary rounded-full border-2 border-white shadow-sm flex items-center justify-center">
                         <div className="w-1.5 h-1.5 bg-white rounded-full" />
                       </div>
@@ -136,7 +152,6 @@ export function Calibration({ onComplete, onCancel }: CalibrationProps) {
             )}
           </div>
         ) : (
-          /* Step 3: Complete */
           <div className="flex flex-col items-center text-center py-4">
             <div className="w-20 h-20 rounded-full bg-success-light flex items-center justify-center mb-5">
               <CheckCircle className="w-10 h-10 text-success" />
@@ -164,14 +179,14 @@ export function Calibration({ onComplete, onCancel }: CalibrationProps) {
       {/* Actions */}
       <div className="flex items-center gap-3">
         <button onClick={onCancel}
-          className="flex-1 py-3.5 rounded-xl text-on-surface-variant font-semibold text-sm border border-outline hover:bg-surface-dim transition-all">
+          className="flex-1 py-4 rounded-xl text-on-surface-variant font-semibold text-sm border border-outline hover:bg-surface-dim transition-all">
           Cancel
         </button>
-        {step !== 2 && (
-          <button onClick={handleNext}
-            className="flex-1 py-3.5 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/15 hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-2">
-            {step === 3 ? 'Start Monitoring' : 'Next'}
-            <ArrowRight className="w-4 h-4" />
+        {step === 3 && (
+          <button onClick={onComplete}
+            className="flex-1 py-4 rounded-xl bg-success text-white font-bold text-sm shadow-lg shadow-success/15 hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-2">
+            Start Monitoring
+            <CheckCircle className="w-4 h-4" />
           </button>
         )}
       </div>

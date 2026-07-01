@@ -38,7 +38,7 @@ export function Activity({
 
   const goalPercent = Math.min(100, Math.round((program.todayMinutes / program.dailyGoalMinutes) * 100));
   const circumference = 2 * Math.PI * 90;
-  
+
   // Total goal for session is 15 minutes (900 seconds)
   const sessionGoalSeconds = 900;
   const timerOffset = isTraining
@@ -49,7 +49,7 @@ export function Activity({
     <div className="px-5 py-6 space-y-5 relative">
       <AnimatePresence>
         {showResults && lastCompletedSession && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -59,7 +59,7 @@ export function Activity({
               <div className="w-20 h-20 bg-success-light rounded-full flex items-center justify-center mb-6 shadow-lg shadow-success/20">
                 <Trophy className="w-10 h-10 text-success" />
               </div>
-              
+
               <h2 className="text-2xl font-black text-on-surface mb-2">Session Complete!</h2>
               <p className="text-on-surface-muted text-sm mb-8 px-4">
                 Great job! You've just completed your posture training session.
@@ -84,7 +84,7 @@ export function Activity({
                 </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => setShowResults(false)}
                 className="w-full py-4 rounded-2xl bg-primary text-white font-bold text-lg shadow-lg shadow-primary/20 active:scale-[0.97] transition-all"
               >
@@ -118,7 +118,7 @@ export function Activity({
       {/* Training Control */}
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
         className="bg-surface-elevated rounded-3xl p-6 shadow-sm border border-outline-variant/10 flex flex-col items-center">
-        
+
         {/* Timer Ring */}
         <div className="relative mb-6">
           <div className="absolute inset-0 rounded-full bg-surface-dim/30 animate-pulse" />
@@ -136,9 +136,8 @@ export function Activity({
                   {formatTime(elapsedSeconds)}
                 </span>
                 <div className="flex items-center gap-1.5 mt-2 bg-surface/50 px-3 py-1 rounded-full border border-outline-variant/10">
-                  <div className={`w-2 h-2 rounded-full ${
-                    posture.status === 'good' ? 'bg-success animate-pulse' : posture.status === 'warning' ? 'bg-warning' : 'bg-danger animate-bounce'
-                  }`} />
+                  <div className={`w-2 h-2 rounded-full ${posture.status === 'good' ? 'bg-success animate-pulse' : posture.status === 'warning' ? 'bg-warning' : 'bg-danger animate-bounce'
+                    }`} />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                     {posture.status === 'good' ? 'Perfect' : posture.status === 'warning' ? 'Adjust' : 'Slouching'}
                   </span>
@@ -155,11 +154,10 @@ export function Activity({
 
         {/* Start/Stop Button */}
         <button onClick={isTraining ? onStopTraining : onStartTraining}
-          className={`w-full py-4.5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-[0.97] hover:brightness-105 ${
-            isTraining
+          className={`w-full py-4.5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all active:scale-[0.97] hover:brightness-105 ${isTraining
               ? 'bg-danger text-white shadow-xl shadow-danger/20'
               : 'bg-primary text-white shadow-xl shadow-primary/20'
-          }`}>
+            }`}>
           {isTraining ? <><Square className="w-5 h-5 fill-current" /> Stop Training</> : <><Play className="w-5 h-5 fill-current" /> Start Training</>}
         </button>
 
@@ -173,14 +171,14 @@ export function Activity({
             <span className="font-black text-on-surface">{program.todayMinutes} / {program.dailyGoalMinutes} min</span>
           </div>
           <div className="w-full h-3 bg-surface-dim rounded-full overflow-hidden p-0.5 border border-outline-variant/10">
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${goalPercent}%` }}
-              className="h-full bg-primary rounded-full" 
+              className="h-full bg-primary rounded-full"
             />
           </div>
           {program.completedToday && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-2 text-success bg-success-light/20 p-2.5 rounded-xl border border-success/10"
@@ -232,9 +230,8 @@ export function Activity({
             sessionHistory.slice(0, 5).map(session => (
               <motion.div key={session.id} whileHover={{ x: 4 }}
                 className="bg-surface-elevated rounded-2xl p-4 border border-outline-variant/10 flex items-center gap-4 shadow-sm">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black shadow-inner ${
-                  session.avgScore >= 80 ? 'bg-success-light text-success' : session.avgScore >= 60 ? 'bg-warning-light text-warning' : 'bg-danger-light text-danger'
-                }`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black shadow-inner ${session.avgScore >= 80 ? 'bg-success-light text-success' : session.avgScore >= 60 ? 'bg-warning-light text-warning' : 'bg-danger-light text-danger'
+                  }`}>
                   {session.avgScore}
                 </div>
                 <div className="flex-1 min-w-0">
